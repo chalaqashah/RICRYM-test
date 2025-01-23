@@ -9,21 +9,21 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-faker/faker/v4"
-	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
+	"github.com/go-faker/faker/v4"    // Library for generating fake data
+	"github.com/gorilla/mux"          // HTTP router library for handling routes
+	"github.com/jackc/pgx/v5/pgxpool" // PostgreSQL connection pooling
+	"github.com/joho/godotenv"        // Library for loading environment variables
 )
 
 // Database connection string (Replace with your details)
 const dbURL = "postgres://postgres:wishal2311@localhost:5432/try_db"
 
-var dbpool *pgxpool.Pool // Global database connection
+var dbpool *pgxpool.Pool // Global database connection pool
 
 // ✅ Initialize Database Connection
 func initDB() {
 	var err error
-	dbpool, err = pgxpool.New(context.Background(), dbURL)
+	dbpool, err = pgxpool.New(context.Background(), dbURL) // Connect to PostgreSQL
 	if err != nil {
 		log.Fatalf("❌ Unable to connect to database: %v\n", err)
 	}
@@ -32,20 +32,22 @@ func initDB() {
 
 // ✅ Home Route Handler
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello from Go backend!")
+	fmt.Fprintln(w, "Hello from Go backend!") // Respond with a simple message
 }
 
 // ✅ Fetch All Accounts from PostgreSQL
 func getAccounts(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("🔍 Fetching accounts from database...")
 
+	// Query all accounts from the database
 	rows, err := dbpool.Query(context.Background(), "SELECT acc_id, username, email FROM Account")
 	if err != nil {
 		http.Error(w, "Failed to fetch accounts", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer rows.Close() // Close the rows after the function ends
 
+	// Store accounts in a slice of maps
 	var accounts []map[string]interface{}
 	for rows.Next() {
 		var accID int
@@ -62,10 +64,12 @@ func getAccounts(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// If no accounts are found, log a message
 	if len(accounts) == 0 {
 		fmt.Println("⚠️ No accounts found in the database!")
 	}
 
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(accounts)
 }
@@ -74,13 +78,15 @@ func getAccounts(w http.ResponseWriter, r *http.Request) {
 func getScores(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("🔍 Fetching scores from database...")
 
+	// Query all scores from the database
 	rows, err := dbpool.Query(context.Background(), "SELECT score_id, char_id, class_id, reward_score FROM Scores")
 	if err != nil {
 		http.Error(w, "Failed to fetch scores", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer rows.Close() // Ensure rows are closed
 
+	// Store scores in a slice of maps
 	var scores []map[string]interface{}
 	for rows.Next() {
 		var scoreID, charID, classID, rewardScore int
@@ -97,10 +103,12 @@ func getScores(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// If no scores are found, log a message
 	if len(scores) == 0 {
 		fmt.Println("⚠️ No scores found in the database!")
 	}
 
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(scores)
 }
@@ -112,20 +120,19 @@ func main() {
 
 	// Initialize database connection
 	initDB()
-	defer dbpool.Close()
+	defer dbpool.Close() // Ensure the database connection is closed when the program exits
 
 	// ✅ Set up router using `gorilla/mux`
-	// ✅ Correct usage of Gorilla Mux
 	r := mux.NewRouter()
-	r.HandleFunc("/", handler).Methods("GET")
-	r.HandleFunc("/api/accounts", getAccounts).Methods("GET")
-	r.HandleFunc("/api/scores", getScores).Methods("GET")
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	// ✅ Register API Routes
+	r.HandleFunc("/", handler).Methods("GET")                 // Home route
+	r.HandleFunc("/api/accounts", getAccounts).Methods("GET") // Fetch all accounts
+	r.HandleFunc("/api/scores", getScores).Methods("GET")     // Fetch all scores
 
-	// ✅ Start the HTTP server (Runs **AFTER** everything is set up)
+	// ✅ Start the HTTP server
 	fmt.Println("🚀 Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(":8080", r)) // Start server and log any fatal errors
 }
 
 // Function to get all accounts from the database
