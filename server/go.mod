@@ -4,6 +4,7 @@ go 1.23.4
 
 require (
 	github.com/go-faker/faker/v4 v4.5.0
+	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/joho/godotenv v1.5.1
 )

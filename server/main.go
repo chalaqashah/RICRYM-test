@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -9,49 +10,122 @@ import (
 	"time"
 
 	"github.com/go-faker/faker/v4"
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
-// Database connection string (replace with your details)
+// Database connection string (Replace with your details)
 const dbURL = "postgres://postgres:wishal2311@localhost:5432/try_db"
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello from Go backend!")
+var dbpool *pgxpool.Pool // Global database connection
+
+// ✅ Initialize Database Connection
+func initDB() {
+	var err error
+	dbpool, err = pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Fatalf("❌ Unable to connect to database: %v\n", err)
+	}
+	fmt.Println("✅ Connected to PostgreSQL successfully!")
 }
 
-func main() {
+// ✅ Home Route Handler
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Hello from Go backend!")
+}
 
-	godotenv.Load()
-	http.HandleFunc("/", handler)
-	fmt.Println("Server listening on port 8080")
-	http.ListenAndServe(":8080", nil)
+// ✅ Fetch All Accounts from PostgreSQL
+func getAccounts(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("🔍 Fetching accounts from database...")
 
-	// Create a connection pool
-	dbpool, err := pgxpool.New(context.Background(), dbURL)
+	rows, err := dbpool.Query(context.Background(), "SELECT acc_id, username, email FROM Account")
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		http.Error(w, "Failed to fetch accounts", http.StatusInternalServerError)
+		return
 	}
+	defer rows.Close()
+
+	var accounts []map[string]interface{}
+	for rows.Next() {
+		var accID int
+		var username, email string
+		err := rows.Scan(&accID, &username, &email)
+		if err != nil {
+			http.Error(w, "Error scanning row", http.StatusInternalServerError)
+			return
+		}
+		accounts = append(accounts, map[string]interface{}{
+			"acc_id":   accID,
+			"username": username,
+			"email":    email,
+		})
+	}
+
+	if len(accounts) == 0 {
+		fmt.Println("⚠️ No accounts found in the database!")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(accounts)
+}
+
+// ✅ Fetch All Scores from PostgreSQL
+func getScores(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("🔍 Fetching scores from database...")
+
+	rows, err := dbpool.Query(context.Background(), "SELECT score_id, char_id, class_id, reward_score FROM Scores")
+	if err != nil {
+		http.Error(w, "Failed to fetch scores", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var scores []map[string]interface{}
+	for rows.Next() {
+		var scoreID, charID, classID, rewardScore int
+		err := rows.Scan(&scoreID, &charID, &classID, &rewardScore)
+		if err != nil {
+			http.Error(w, "Error scanning row", http.StatusInternalServerError)
+			return
+		}
+		scores = append(scores, map[string]interface{}{
+			"score_id":     scoreID,
+			"char_id":      charID,
+			"class_id":     classID,
+			"reward_score": rewardScore,
+		})
+	}
+
+	if len(scores) == 0 {
+		fmt.Println("⚠️ No scores found in the database!")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(scores)
+}
+
+// ✅ Main Function
+func main() {
+	// Load environment variables
+	godotenv.Load()
+
+	// Initialize database connection
+	initDB()
 	defer dbpool.Close()
-	fmt.Println("✅ Connected to PostgreSQL successfully!")
 
-	// Test: Get all accounts
-	GetAllAccounts(dbpool)
+	// ✅ Set up router using `gorilla/mux`
+	// ✅ Correct usage of Gorilla Mux
+	r := mux.NewRouter()
+	r.HandleFunc("/", handler).Methods("GET")
+	r.HandleFunc("/api/accounts", getAccounts).Methods("GET")
+	r.HandleFunc("/api/scores", getScores).Methods("GET")
 
-	InsertAccount(dbpool, "player3", "player3@example.com")
+	log.Fatal(http.ListenAndServe(":8080", r))
 
-	GetAllCharacters(dbpool)
-
-	GetAllScores(dbpool)
-
-	GetRankings(dbpool)
-
-	// Generate and insert fake data
-	GenerateFakeAccounts(dbpool, 100000)
-	GenerateFakeCharacters(dbpool, 100000)
-	GenerateFakeScores(dbpool, 100000)
-
-	fmt.Println("🚀 Data generation complete!")
+	// ✅ Start the HTTP server (Runs **AFTER** everything is set up)
+	fmt.Println("🚀 Server running on http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 // Function to get all accounts from the database
